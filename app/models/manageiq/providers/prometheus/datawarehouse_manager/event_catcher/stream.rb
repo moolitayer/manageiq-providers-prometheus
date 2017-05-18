@@ -1,7 +1,6 @@
 class ManageIQ::Providers::Prometheus::DatawarehouseManager::EventCatcher::Stream
   def initialize(ems)
     @ems               = ems
-    @alerts_client     = ems.alerts_client
     @collecting_events = false
   end
 
@@ -27,12 +26,14 @@ class ManageIQ::Providers::Prometheus::DatawarehouseManager::EventCatcher::Strea
   # would be more than one for the same millisecond, and that the query would be performed in the midst of
   # writes for the same ms. It may be a feasible scenario but I think it's unnecessary to handle it at this time.
   def fetch
-    @start_time ||= (Time.current - 1.minute).to_i * 1000
-    $mw_log.debug "Catching Events since [#{@start_time}]"
+    endpoint = "http://#{@ems.hostname}"
+    connection = Faraday.new(endpoint) do |conn|
+      conn.response :json, :content_type => /\bjson$/
 
-    new_events = @alerts_client.list_events("startTime" => @start_time, "tags" => "miq.event_type|*", "thin" => true)
-    @start_time = new_events.max_by(&:ctime).ctime + 1 unless new_events.empty? # add 1 ms to avoid dups with GTE filter
-    new_events
+      conn.adapter Faraday.default_adapter
+    end
+    json_response = connection.get('/api/v1/alerts')
+    json_response.body[:data] || []
   rescue => err
     $mw_log.info "Error capturing events #{err}"
     []
