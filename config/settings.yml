@@ -1,0 +1,12 @@
+---
+:ems:
+  :ems_prometheus:
+    :blacklisted_event_names: []
+    :event_handling:
+      :event_groups:
+:http_proxy:
+  :prometheus:
+    :host:
+    :password:
+    :port:
+    :user:
