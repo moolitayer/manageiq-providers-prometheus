@@ -6,24 +6,6 @@ class ManageIQ::Providers::Prometheus::DatawarehouseManager::EventCatcher::Runne
 
   def initialize(cfg = {})
     super
-
-    # Supported event_types (see settings.yml)
-    @whitelist = [
-      # summary
-      'hawkular_datasource.error',
-      'hawkular_datasource_remove.error',
-      'hawkular_deployment.error',
-      'hawkular_deployment_remove.error',
-      'hawkular_event.critical', # general purpose critical/summary level event
-      # detail
-      'hawkular_datasource.ok',
-      'hawkular_datasource_remove.ok',
-      'hawkular_deployment.ok',
-      'hawkular_deployment_remove.ok',
-      'hawkular_event', # general purpose detail level event
-      # filtered (not shown in timeline)
-      'hawkular_alert'
-    ].to_set.freeze
   end
 
   def reset_event_monitor_handle
@@ -40,11 +22,9 @@ class ManageIQ::Providers::Prometheus::DatawarehouseManager::EventCatcher::Runne
     event_monitor_handle.start
     event_monitor_handle.each_batch do |events|
       event_monitor_running
-      new_events = events.select { |e| whitelist?(e) }
-      $mw_log.debug("#{log_prefix} Discarding events #{events - new_events}") if new_events.length < events.length
-      if new_events.any?
-        $mw_log.debug "#{log_prefix} Queueing events #{new_events}"
-        @queue.enq new_events
+      if events.any?
+        $mw_log.debug "#{log_prefix} Queueing events #{events}"
+        @queue.enq events
       end
       # invoke the configured sleep before the next event fetch
       sleep_poll_normal
@@ -54,7 +34,6 @@ class ManageIQ::Providers::Prometheus::DatawarehouseManager::EventCatcher::Runne
   end
 
   def process_event(event)
-    $mw_log.debug "Processing Event #{event}"
     event_hash = event_to_hash(event, @cfg[:ems_id])
 
     if blacklist?(event_hash[:event_type])
@@ -71,18 +50,12 @@ class ManageIQ::Providers::Prometheus::DatawarehouseManager::EventCatcher::Runne
     @event_monitor_handle ||= ManageIQ::Providers::Prometheus::DatawarehouseManager::EventCatcher::Stream.new(@ems)
   end
 
-  def whitelist?(event)
-    tags = event.tags
-    return false unless tags
-    event_type = tags[TAG_EVENT_TYPE]
-    event_type && @whitelist.include?(event_type)
-  end
-
   def blacklist?(event_type)
     filtered_events.include?(event_type)
   end
 
   def event_to_hash(event, ems_id = nil)
+    puts "event_to_hash event: #{event}"
     event.event_type = event.tags[TAG_EVENT_TYPE]
     if event.context
       event.message        = event.context['message'] # optional, prefer context message if provided

@@ -1,8 +1,5 @@
 module ManageIQ::Providers
   class Prometheus::DatawarehouseManager < ManageIQ::Providers::DatawarehouseManager
-    require 'openssl'
-    require 'hawkular/hawkular_client'
-
     require_nested :EventCatcher
     require_nested :RefreshParser
     require_nested :RefreshWorker
@@ -16,18 +13,8 @@ module ManageIQ::Providers
     end
 
     def verify_credentials(_auth_type = nil, options = {})
-      connect(options).fetch_version_and_status
-    rescue URI::InvalidComponentError
-      raise MiqException::MiqHostError, "Host '#{hostname}' is invalid"
-    rescue ::Prometheus::BaseClient::HawkularConnectionException
-      raise MiqException::MiqUnreachableError, "Unable to connect to #{hostname}:#{port}"
-    rescue ::Prometheus::BaseClient::HawkularException => he
-      raise MiqException::MiqInvalidCredentialsError, 'Invalid credentials' if he.status_code == 401
-      raise MiqException::MiqHostError, 'Hawkular not found on host' if he.status_code == 404
-      raise MiqException::MiqCommunicationsError, he.message
-    rescue => err
-      $log.error(err)
-      raise MiqException::Error, 'Unable to verify credentials'
+      # Do nothing
+      true
     end
 
     def validate_authentication_status
@@ -35,12 +22,7 @@ module ManageIQ::Providers
     end
 
     def verify_ssl_mode(endpoint = default_endpoint)
-      case endpoint.security_protocol
-      when 'ssl-without-validation'
-        OpenSSL::SSL::VERIFY_NONE
-      else # 'ssl-with-validation', 'ssl-with-validation-custom-ca', secure by default with unexpected values.
-        OpenSSL::SSL::VERIFY_PEER
-      end
+      OpenSSL::SSL::VERIFY_NONE
     end
 
     # Hawkular Client
